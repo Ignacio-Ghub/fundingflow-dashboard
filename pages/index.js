@@ -40,6 +40,7 @@ export default function Home() {
   const [search, setSearch] = useState('')
   const [filterEstado, setFilterEstado] = useState('')
   const chartsRef = useRef({})
+  const chartJsReady = useRef(false)
 
   function addToast(type, title, body) {
     const id = Date.now()
@@ -75,30 +76,30 @@ export default function Home() {
 
   useEffect(() => {
     if (tab !== 'overview' || data.length === 0) return
-    const timer = setTimeout(() => drawCharts(), 150)
+    const timer = setTimeout(() => drawCharts(), 200)
     return () => clearTimeout(timer)
   }, [tab, data])
 
   function drawCharts() {
-    if (typeof window === 'undefined') return
-    import('chart.js/auto').then(mod => {
-      const Chart = mod.default
-      Object.values(chartsRef.current).forEach(c => { try { c.destroy() } catch {} })
-      chartsRef.current = {}
-      const ESTADOS = ['en_análisis','en_elaboración','concept_note','propuesta_completa','enviada','en_negociación','aprobada','rechazada','archivada']
-      const LABELS  = ['En análisis','En elaboración','Concept Note','Propuesta','Enviada','Negociación','Aprobada','Rechazada','Archivada']
-      const COLORS  = ['#1a7fd4','#d29922','#a371f7','#3fb950','#8b949e','#f0a500','#39d353','#f85149','#444c56']
-      const nonZero = ESTADOS.map((e,i) => ({ label:LABELS[i], count:data.filter(r=>r.Estado===e).length, color:COLORS[i] })).filter(x=>x.count>0)
-      const c1 = document.getElementById('chartEstados')
-      const c2 = document.getElementById('chartUrgencia')
-      if (c1 && nonZero.length) {
-        chartsRef.current.estados = new Chart(c1, { type:'doughnut', data:{ labels:nonZero.map(x=>x.label), datasets:[{ data:nonZero.map(x=>x.count), backgroundColor:nonZero.map(x=>x.color), borderWidth:0 }]}, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'right', labels:{ color:'#8b949e', font:{ size:11 }}}}}})
-      }
-      if (c2) {
-        const urg = { 'Crítica (≤3d)':data.filter(r=>r._urg==='critical').length, 'Pronto (4-14d)':data.filter(r=>r._urg==='warning').length, 'OK (>14d)':data.filter(r=>r._urg==='ok').length, 'Sin fecha':data.filter(r=>r._urg==='none').length }
-        chartsRef.current.urg = new Chart(c2, { type:'bar', data:{ labels:Object.keys(urg), datasets:[{ data:Object.values(urg), backgroundColor:['#f85149','#d29922','#3fb950','#444c56'], borderWidth:0, borderRadius:6 }]}, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false }}, scales:{ y:{ beginAtZero:true, grid:{ color:'rgba(48,54,61,0.6)' }, ticks:{ color:'#8b949e', stepSize:1 }}, x:{ grid:{ display:false }, ticks:{ color:'#8b949e', font:{ size:11 }}}}}})
-      }
-    })
+    if (typeof window === 'undefined' || !window.Chart) return
+    const Chart = window.Chart
+    Object.values(chartsRef.current).forEach(c => { try { c.destroy() } catch {} })
+    chartsRef.current = {}
+
+    const ESTADOS = ['en_análisis','en_elaboración','concept_note','propuesta_completa','enviada','en_negociación','aprobada','rechazada','archivada']
+    const LABELS  = ['En análisis','En elaboración','Concept Note','Propuesta','Enviada','Negociación','Aprobada','Rechazada','Archivada']
+    const COLORS  = ['#1a7fd4','#d29922','#a371f7','#3fb950','#8b949e','#f0a500','#39d353','#f85149','#444c56']
+    const nonZero = ESTADOS.map((e,i) => ({ label:LABELS[i], count:data.filter(r=>r.Estado===e).length, color:COLORS[i] })).filter(x=>x.count>0)
+
+    const c1 = document.getElementById('chartEstados')
+    const c2 = document.getElementById('chartUrgencia')
+    if (c1 && nonZero.length) {
+      chartsRef.current.estados = new Chart(c1, { type:'doughnut', data:{ labels:nonZero.map(x=>x.label), datasets:[{ data:nonZero.map(x=>x.count), backgroundColor:nonZero.map(x=>x.color), borderWidth:0 }]}, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'right', labels:{ color:'#8b949e', font:{ size:11 }}}}}})
+    }
+    if (c2) {
+      const urg = { 'Crítica (≤3d)':data.filter(r=>r._urg==='critical').length, 'Pronto (4-14d)':data.filter(r=>r._urg==='warning').length, 'OK (>14d)':data.filter(r=>r._urg==='ok').length, 'Sin fecha':data.filter(r=>r._urg==='none').length }
+      chartsRef.current.urg = new Chart(c2, { type:'bar', data:{ labels:Object.keys(urg), datasets:[{ data:Object.values(urg), backgroundColor:['#f85149','#d29922','#3fb950','#444c56'], borderWidth:0, borderRadius:6 }]}, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false }}, scales:{ y:{ beginAtZero:true, grid:{ color:'rgba(48,54,61,0.6)' }, ticks:{ color:'#8b949e', stepSize:1 }}, x:{ grid:{ display:false }, ticks:{ color:'#8b949e', font:{ size:11 }}}}}})
+    }
   }
 
   async function enviarAccion() {
@@ -147,6 +148,7 @@ export default function Home() {
         <meta name="description" content="Dashboard de gestión de convocatorias para el sector social. Powered by n8n + GPT-4o." />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+        <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
       </Head>
 
       <style>{`
@@ -269,7 +271,6 @@ export default function Home() {
         @media(max-width:768px){.header{flex-direction:column;gap:10px}.content{padding:14px}.charts{grid-template-columns:1fr}.kanban{grid-template-columns:1fr 1fr}.action-grid{grid-template-columns:1fr}}
       `}</style>
 
-      {/* HEADER */}
       <div className="header">
         <div className="header-left">
           <div className="logo">Funding<span>Flow</span></div>
@@ -281,7 +282,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* TABS */}
       <div className="tabs">
         {TABS.map(([id,label]) => (
           <button key={id} className={`tab${tab===id?' active':''}`} onClick={() => setTab(id)}>{label}</button>
@@ -290,7 +290,6 @@ export default function Home() {
 
       <div className="content">
 
-        {/* ── OVERVIEW ── */}
         {tab==='overview' && <>
           <div className="metrics">
             {data.length===0
@@ -325,7 +324,6 @@ export default function Home() {
           </div>
         </>}
 
-        {/* ── PIPELINE ── */}
         {tab==='pipeline' && <>
           <div className="action-panel">
             <div className="section-title">⚡ Actualizar pipeline — notificación automática al guardar</div>
@@ -343,36 +341,11 @@ export default function Home() {
                   <option value="comentario">💬 Agregar comentario</option>
                 </select>
               </div>
-              {actionType==='cambio_estado' && (
-                <div className="form-group">
-                  <label className="form-label">Nuevo estado</label>
-                  <select className="form-select" value={actionEstado} onChange={e=>setActionEstado(e.target.value)}>
-                    <option value="">— Estado —</option>
-                    {['en_análisis','en_elaboración','concept_note','propuesta_completa','enviada','en_negociación','aprobada','rechazada','archivada'].map(e=><option key={e} value={e}>{e.replace(/_/g,' ')}</option>)}
-                  </select>
-                </div>
-              )}
-              {actionType==='asignar' && (
-                <div className="form-group">
-                  <label className="form-label">Responsable</label>
-                  <input type="text" className="form-input" value={actionResponsable} onChange={e=>setActionResponsable(e.target.value)} placeholder="Nombre completo"/>
-                </div>
-              )}
-              {actionType==='comentario' && (
-                <div className="form-group">
-                  <label className="form-label">Comentario</label>
-                  <input type="text" className="form-input" value={actionComentario} onChange={e=>setActionComentario(e.target.value)} placeholder="Escribe el comentario..."/>
-                </div>
-              )}
-              <div className="form-group">
-                <label className="form-label">Usuario</label>
-                <input type="text" className="form-input" value={actionUsuario} onChange={e=>setActionUsuario(e.target.value)} placeholder="Tu nombre"/>
-              </div>
-              <div className="form-group" style={{justifyContent:'flex-end'}}>
-                <button className="btn-send" onClick={enviarAccion} disabled={sending}>
-                  {sending?<><div className="spinner-sm"/>Enviando...</>:'Enviar'}
-                </button>
-              </div>
+              {actionType==='cambio_estado' && <div className="form-group"><label className="form-label">Nuevo estado</label><select className="form-select" value={actionEstado} onChange={e=>setActionEstado(e.target.value)}><option value="">— Estado —</option>{['en_análisis','en_elaboración','concept_note','propuesta_completa','enviada','en_negociación','aprobada','rechazada','archivada'].map(e=><option key={e} value={e}>{e.replace(/_/g,' ')}</option>)}</select></div>}
+              {actionType==='asignar' && <div className="form-group"><label className="form-label">Responsable</label><input type="text" className="form-input" value={actionResponsable} onChange={e=>setActionResponsable(e.target.value)} placeholder="Nombre completo"/></div>}
+              {actionType==='comentario' && <div className="form-group"><label className="form-label">Comentario</label><input type="text" className="form-input" value={actionComentario} onChange={e=>setActionComentario(e.target.value)} placeholder="Escribe el comentario..."/></div>}
+              <div className="form-group"><label className="form-label">Usuario</label><input type="text" className="form-input" value={actionUsuario} onChange={e=>setActionUsuario(e.target.value)} placeholder="Tu nombre"/></div>
+              <div className="form-group" style={{justifyContent:'flex-end'}}><button className="btn-send" onClick={enviarAccion} disabled={sending}>{sending?<><div className="spinner-sm"/>Enviando...</>:'Enviar'}</button></div>
             </div>
           </div>
           <div className="kanban">
@@ -380,25 +353,13 @@ export default function Home() {
               const items = data.filter(r=>r.Estado===estado).sort((a,b)=>(a._dias||999)-(b._dias||999))
               return (
                 <div key={estado} className="kanban-col">
-                  <div className="kanban-col-header">
-                    <span className="kanban-col-title">{LABELS_K[estado]}</span>
-                    <span className="kanban-count">{items.length}</span>
-                  </div>
-                  {items.length===0
-                    ? <div style={{fontSize:'11px',color:'var(--text2)',textAlign:'center',padding:'12px 0'}}>Sin registros</div>
+                  <div className="kanban-col-header"><span className="kanban-col-title">{LABELS_K[estado]}</span><span className="kanban-count">{items.length}</span></div>
+                  {items.length===0 ? <div style={{fontSize:'11px',color:'var(--text2)',textAlign:'center',padding:'12px 0'}}>Sin registros</div>
                     : items.map(r => {
-                        const uc = r._urg==='critical'?'urgent':r._urg==='warning'?'soon':''
-                        const dl = r._dias!==null&&r._dias>=0?'📅 '+r._dias+'d':r.Fecha_Limite?'⚠️ vencida':'sin fecha'
-                        return (
-                          <div key={r.ID_Convocatoria} className={`kanban-card ${uc}`} onClick={()=>{ setActionId(r.ID_Convocatoria); addToast('info',r.ID_Convocatoria+' seleccionado','Elige la acción y completa los campos') }}>
-                            <div className="kcard-id">{r.ID_Convocatoria}</div>
-                            <div className="kcard-name">{r.Nombre||'—'}</div>
-                            <div className="kcard-donor">🏛️ {r.Donante||'—'}</div>
-                            <div className="kcard-footer"><span className="kcard-amount">{r.Monto_Solicitado||'—'}</span><span className="kcard-days">{dl}</span></div>
-                            <div className="kcard-tip">Click para seleccionar →</div>
-                          </div>
-                        )
-                      })
+                      const uc=r._urg==='critical'?'urgent':r._urg==='warning'?'soon':''
+                      const dl=r._dias!==null&&r._dias>=0?'📅 '+r._dias+'d':r.Fecha_Limite?'⚠️ vencida':'sin fecha'
+                      return <div key={r.ID_Convocatoria} className={`kanban-card ${uc}`} onClick={()=>{setActionId(r.ID_Convocatoria);addToast('info',r.ID_Convocatoria+' seleccionado','Elige la acción y completa los campos')}}><div className="kcard-id">{r.ID_Convocatoria}</div><div className="kcard-name">{r.Nombre||'—'}</div><div className="kcard-donor">🏛️ {r.Donante||'—'}</div><div className="kcard-footer"><span className="kcard-amount">{r.Monto_Solicitado||'—'}</span><span className="kcard-days">{dl}</span></div><div className="kcard-tip">Click para seleccionar →</div></div>
+                    })
                   }
                 </div>
               )
@@ -406,7 +367,6 @@ export default function Home() {
           </div>
         </>}
 
-        {/* ── CONVOCATORIAS ── */}
         {tab==='convocatorias' && (
           <div className="table-wrap">
             <div className="table-header">
@@ -419,54 +379,24 @@ export default function Home() {
                 </select>
               </div>
             </div>
-            {tableData.length===0
-              ? <div className="empty">Sin resultados</div>
-              : <table>
-                  <thead><tr><th>ID</th><th>Nombre</th><th>Donante</th><th>Estado</th><th>Responsable</th><th>Fecha límite</th><th>Días</th><th>Monto</th><th>Link</th></tr></thead>
-                  <tbody>
-                    {tableData.map(r=>(
-                      <tr key={r.ID_Convocatoria}>
-                        <td style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--text2)'}}>{r.ID_Convocatoria}</td>
-                        <td><strong>{r.Nombre||'—'}</strong></td>
-                        <td>{r.Donante||'—'}</td>
-                        <td><span className={`badge ${r.Estado||''}`}>{(r.Estado||'—').replace(/_/g,' ')}</span></td>
-                        <td>{r.Responsable||'—'}</td>
-                        <td style={{fontFamily:'var(--mono)',fontSize:'11px'}}>{r.Fecha_Limite||'—'}</td>
-                        <td><span className={`urg-dot ${r._urg}`}/>{r._dias!==null?(r._dias>=0?r._dias+'d':'Vencida'):'—'}</td>
-                        <td style={{fontFamily:'var(--mono)',fontSize:'11px'}}>{r.Monto_Solicitado||'—'}</td>
-                        <td>{r.Convocatoria_URL?<a href={r.Convocatoria_URL} target="_blank" rel="noreferrer">Ver →</a>:'—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            {tableData.length===0 ? <div className="empty">Sin resultados</div>
+              : <table><thead><tr><th>ID</th><th>Nombre</th><th>Donante</th><th>Estado</th><th>Responsable</th><th>Fecha límite</th><th>Días</th><th>Monto</th><th>Link</th></tr></thead>
+                <tbody>{tableData.map(r=><tr key={r.ID_Convocatoria}><td style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--text2)'}}>{r.ID_Convocatoria}</td><td><strong>{r.Nombre||'—'}</strong></td><td>{r.Donante||'—'}</td><td><span className={`badge ${r.Estado||''}`}>{(r.Estado||'—').replace(/_/g,' ')}</span></td><td>{r.Responsable||'—'}</td><td style={{fontFamily:'var(--mono)',fontSize:'11px'}}>{r.Fecha_Limite||'—'}</td><td><span className={`urg-dot ${r._urg}`}/>{r._dias!==null?(r._dias>=0?r._dias+'d':'Vencida'):'—'}</td><td style={{fontFamily:'var(--mono)',fontSize:'11px'}}>{r.Monto_Solicitado||'—'}</td><td>{r.Convocatoria_URL?<a href={r.Convocatoria_URL} target="_blank" rel="noreferrer">Ver →</a>:'—'}</td></tr>)}</tbody>
+              </table>
             }
           </div>
         )}
 
-        {/* ── FLUJOS ── */}
         {tab==='flujos' && (
           <div className="flows-grid">
-            {[
-              ['📡 Flujo 1 — Monitor RSS','Cada 6 horas','FundsForNGOs · TerraViva · Grant4EU','Captura y deduplica'],
-              ['🤖 Flujo 2 — Extracción IA','Trigger: nuevos registros','GPT-4o-mini','Extrae datos clave'],
-              ['🔔 Flujo 3 — Alertas','Diario 9:00 AM','Telegram · Slack · Gmail','Alertas urgentes'],
-              ['📋 Flujo 4 — Pipeline','Webhook + 8:00 AM','Estado · Responsable · Notas','Notifica cambios'],
-              ['📊 Flujo 5 — Reporte Semanal','Lunes 8:00 AM','Email HTML + Telegram','Resumen IA'],
-              ['🖥️ Flujo 6 — API Dashboard','On demand','GET datos · POST acciones','Sirve este dashboard'],
-            ].map(([name,time,tools,status])=>(
-              <div key={name} className="flow-card">
-                <div className="flow-header"><span className="flow-name">{name}</span><div className="flow-dot"/></div>
-                <div className="flow-stat">⏱️ {time}</div>
-                <div className="flow-stat">🔗 {tools}</div>
-                <div className="flow-stat" style={{color:'var(--green)'}}>✅ {status}</div>
-              </div>
+            {[['📡 Flujo 1 — Monitor RSS','Cada 6 horas','FundsForNGOs · TerraViva · Grant4EU','Captura y deduplica'],['🤖 Flujo 2 — Extracción IA','Trigger: nuevos registros','GPT-4o-mini','Extrae datos clave'],['🔔 Flujo 3 — Alertas','Diario 9:00 AM','Telegram · Slack · Gmail','Alertas urgentes'],['📋 Flujo 4 — Pipeline','Webhook + 8:00 AM','Estado · Responsable · Notas','Notifica cambios'],['📊 Flujo 5 — Reporte Semanal','Lunes 8:00 AM','Email HTML + Telegram','Resumen IA'],['🖥️ Flujo 6 — API Dashboard','On demand','GET datos · POST acciones','Sirve este dashboard']].map(([name,time,tools,status])=>(
+              <div key={name} className="flow-card"><div className="flow-header"><span className="flow-name">{name}</span><div className="flow-dot"/></div><div className="flow-stat">⏱️ {time}</div><div className="flow-stat">🔗 {tools}</div><div className="flow-stat" style={{color:'var(--green)'}}>✅ {status}</div></div>
             ))}
           </div>
         )}
 
       </div>
 
-      {/* TOASTS */}
       <div className="toasts">
         {toasts.map(t=>(
           <div key={t.id} className={`toast ${t.type}`}>
